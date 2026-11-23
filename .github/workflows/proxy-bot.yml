@@ -30,7 +30,8 @@ jobs:
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
-          CONCURRENCY: "1500"
+          CONCURRENCY: "3500"
+          DIAL_TIMEOUT_SEC: "2"
           TIMEOUT_SEC: "7"
         run: |
           ulimit -n 65535 || true

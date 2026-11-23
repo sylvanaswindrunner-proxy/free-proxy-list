@@ -12,7 +12,6 @@ import (
 	"mime/multipart"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -89,6 +88,47 @@ var httpSources = []string{
 	"https://api.openproxylist.xyz/http.txt",
 	"https://proxyspace.pro/http.txt",
 	"https://proxyspace.pro/https.txt",
+	"https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&protocol=http&proxy_format=ipport&format=text&timeout=20000",
+	"https://free-proxy-list.net/",
+	"https://www.sslproxies.org/",
+	"https://www.us-proxy.org/",
+	"https://free-proxy-list.net/uk-proxy.html",
+	"https://free-proxy-list.net/anonymous-proxy.html",
+	"https://openproxy.space/list/http",
+	"https://spys.me/proxy.txt",
+	"https://multiproxy.org/txt_all/proxy.txt",
+	"https://rootjazz.com/proxies/proxies.txt",
+	"https://www.proxyscan.io/download?type=http",
+	"https://www.proxyscan.io/download?type=https",
+	"https://proxylist.geonode.com/api/proxy-list?limit=500&page=1&sort_by=lastChecked&sort_type=desc&protocols=http,https",
+	"https://proxylist.geonode.com/api/proxy-list?limit=500&page=2&sort_by=lastChecked&sort_type=desc&protocols=http,https",
+	"https://proxylist.geonode.com/api/proxy-list?limit=500&page=3&sort_by=lastChecked&sort_type=desc&protocols=http,https",
+	"https://proxylist.geonode.com/api/proxy-list?limit=500&page=4&sort_by=lastChecked&sort_type=desc&protocols=http,https",
+	"https://raw.githubusercontent.com/r00tee/Proxy-List/main/Https.txt",
+	"https://raw.githubusercontent.com/casals-ar/proxy-list/main/http",
+	"https://raw.githubusercontent.com/casals-ar/proxy-list/main/https",
+	"https://raw.githubusercontent.com/im-razvan/proxy_list/main/http.txt",
+	"https://raw.githubusercontent.com/Noctiro/getproxy/master/file/http.txt",
+	"https://raw.githubusercontent.com/Noctiro/getproxy/master/file/https.txt",
+	"https://raw.githubusercontent.com/BreakingTechFr/Proxy_Free/main/proxies/http.txt",
+	"https://raw.githubusercontent.com/BreakingTechFr/Proxy_Free/main/proxies/https.txt",
+	"https://raw.githubusercontent.com/Anonym0usWork1221/Free-Proxies/main/proxy_files/http_proxies.txt",
+	"https://raw.githubusercontent.com/Anonym0usWork1221/Free-Proxies/main/proxy_files/https_proxies.txt",
+	"https://raw.githubusercontent.com/zenjahid/FreeProxy4u/master/http.txt",
+	"https://raw.githubusercontent.com/proxylist-to/proxy-list/main/http.txt",
+	"https://raw.githubusercontent.com/ObcbO/getproxy/master/file/http.txt",
+	"https://raw.githubusercontent.com/ObcbO/getproxy/master/file/https.txt",
+	"https://raw.githubusercontent.com/fahimscirex/proxybd/master/proxylist/http.txt",
+	"https://raw.githubusercontent.com/andigwandi/free-proxy/main/proxy_list.txt",
+	"https://raw.githubusercontent.com/fyvri/fresh-proxy-list/archive/storage/classic/http.txt",
+	"https://raw.githubusercontent.com/fyvri/fresh-proxy-list/archive/storage/classic/https.txt",
+	"https://raw.githubusercontent.com/ebrasha/abdal-proxy-hub/main/http-proxy-list-by-EbraSha.txt",
+	"https://raw.githubusercontent.com/ebrasha/abdal-proxy-hub/main/https-proxy-list-by-EbraSha.txt",
+	"https://raw.githubusercontent.com/gfpcom/free-proxy-list/main/list/http.txt",
+	"https://raw.githubusercontent.com/gfpcom/free-proxy-list/main/list/https.txt",
+	"https://raw.githubusercontent.com/Skillter/ProxyGather/master/proxies/working-proxies-http.txt",
+	"https://raw.githubusercontent.com/TuanMinPay/live-proxy/master/all.txt",
+	"https://raw.githubusercontent.com/saisuiu/uiu/main/free.txt",
 }
 
 var socks5Sources = []string{
@@ -128,9 +168,36 @@ var socks5Sources = []string{
 	"https://www.proxy-list.download/api/v1/get?type=socks5",
 	"https://api.openproxylist.xyz/socks5.txt",
 	"https://proxyspace.pro/socks5.txt",
+	"https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&protocol=socks5&proxy_format=ipport&format=text&timeout=20000",
+	"https://www.socks-proxy.net/",
+	"https://openproxy.space/list/socks5",
+	"https://spys.me/socks.txt",
+	"https://www.proxyscan.io/download?type=socks5",
+	"https://proxylist.geonode.com/api/proxy-list?limit=500&page=1&sort_by=lastChecked&sort_type=desc&protocols=socks5",
+	"https://proxylist.geonode.com/api/proxy-list?limit=500&page=2&sort_by=lastChecked&sort_type=desc&protocols=socks5",
+	"https://proxylist.geonode.com/api/proxy-list?limit=500&page=3&sort_by=lastChecked&sort_type=desc&protocols=socks5",
+	"https://proxylist.geonode.com/api/proxy-list?limit=500&page=4&sort_by=lastChecked&sort_type=desc&protocols=socks5",
+	"https://raw.githubusercontent.com/r00tee/Proxy-List/main/Socks5.txt",
+	"https://raw.githubusercontent.com/casals-ar/proxy-list/main/socks5",
+	"https://raw.githubusercontent.com/Noctiro/getproxy/master/file/socks5.txt",
+	"https://raw.githubusercontent.com/BreakingTechFr/Proxy_Free/main/proxies/socks5.txt",
+	"https://raw.githubusercontent.com/Anonym0usWork1221/Free-Proxies/main/proxy_files/socks5_proxies.txt",
+	"https://raw.githubusercontent.com/zenjahid/FreeProxy4u/master/socks5.txt",
+	"https://raw.githubusercontent.com/proxylist-to/proxy-list/main/socks5.txt",
+	"https://raw.githubusercontent.com/ObcbO/getproxy/master/file/socks5.txt",
+	"https://raw.githubusercontent.com/fahimscirex/proxybd/master/proxylist/socks5.txt",
+	"https://raw.githubusercontent.com/fyvri/fresh-proxy-list/archive/storage/classic/socks5.txt",
+	"https://raw.githubusercontent.com/ebrasha/abdal-proxy-hub/main/socks5-proxy-list-by-EbraSha.txt",
+	"https://raw.githubusercontent.com/gfpcom/free-proxy-list/main/list/socks5.txt",
+	"https://raw.githubusercontent.com/Skillter/ProxyGather/master/proxies/working-proxies-socks5.txt",
+	"https://raw.githubusercontent.com/hookzof/socks5_list/master/tg/socks.json",
 }
 
-var ipPortRe = regexp.MustCompile(`(\d{1,3}(?:\.\d{1,3}){3}):(\d{1,5})`)
+var (
+	ipPortRe     = regexp.MustCompile(`(\d{1,3}(?:\.\d{1,3}){3}):(\d{1,5})`)
+	htmlTableRe  = regexp.MustCompile(`(?i)<td[^>]*>\s*(\d{1,3}(?:\.\d{1,3}){3})\s*</td>\s*<td[^>]*>\s*(\d{1,5})\s*</td>`)
+	jsonIPPortRe = regexp.MustCompile(`"(?:ip|host|address)"\s*:\s*"(\d{1,3}(?:\.\d{1,3}){3})"[^}]{0,500}"port"\s*:\s*"?(\d{1,5})"?`)
+)
 
 type ProtocolStats struct {
 	Tested  int `json:"tested"`
@@ -192,7 +259,7 @@ func gatherProxies(sources []string, timeout time.Duration) []string {
 			if err != nil {
 				return
 			}
-			req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; ProxyGatherBot/1.0)")
+			req.Header.Set("User-Agent", probeUA)
 			resp, err := client.Do(req)
 			if err != nil {
 				log.Printf("warn: fetch %s failed: %v", srcURL, err)
@@ -207,11 +274,14 @@ func gatherProxies(sources []string, timeout time.Duration) []string {
 			if err != nil {
 				return
 			}
-			matches := ipPortRe.FindAllStringSubmatch(string(body), -1)
-			local := make([]string, 0, len(matches))
-			for _, m := range matches {
-				if addr, ok := isValidPublicIPv4Port(m[1], m[2]); ok {
-					local = append(local, addr)
+			text := string(body)
+			patterns := []*regexp.Regexp{ipPortRe, htmlTableRe, jsonIPPortRe}
+			local := make([]string, 0, 256)
+			for _, re := range patterns {
+				for _, m := range re.FindAllStringSubmatch(text, -1) {
+					if addr, ok := isValidPublicIPv4Port(m[1], m[2]); ok {
+						local = append(local, addr)
+					}
 				}
 			}
 			mu.Lock()
@@ -321,37 +391,21 @@ func isValidYouTubeRobots(body []byte) bool {
 	return strings.Contains(s, "user-agent:") && strings.Contains(s, "disallow:")
 }
 
-func checkHTTP(proxyAddr string, timeout time.Duration) (time.Duration, bool) {
-	start := time.Now()
-	u := &url.URL{Scheme: "http", Host: proxyAddr}
-	dialer := &net.Dialer{Timeout: timeout}
-	tr := &http.Transport{
-		Proxy:               http.ProxyURL(u),
-		DisableKeepAlives:   true,
-		DialContext:         dialer.DialContext,
-		TLSHandshakeTimeout: timeout,
-	}
-	defer tr.CloseIdleConnections()
-
-	client := &http.Client{
-		Transport: tr,
-		Timeout:   timeout,
-		CheckRedirect: func(*http.Request, []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+func verifyYouTubeOverTunnel(conn net.Conn, start, deadline time.Time) (time.Duration, bool) {
+	tlsConn := tls.Client(conn, &tls.Config{ServerName: probeHost})
+	ctx, cancel := context.WithDeadline(context.Background(), deadline)
 	defer cancel()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, probeURL, nil)
-	if err != nil {
+	if err := tlsConn.HandshakeContext(ctx); err != nil {
 		return 0, false
 	}
-	req.Header.Set("User-Agent", probeUA)
-	req.Header.Set("Accept-Encoding", "identity")
+	_ = tlsConn.SetDeadline(deadline)
 
-	resp, err := client.Do(req)
+	httpReq := "GET /robots.txt HTTP/1.1\r\nHost: " + probeHost + "\r\nUser-Agent: " + probeUA + "\r\nAccept-Encoding: identity\r\nConnection: close\r\n\r\n"
+	if _, err := tlsConn.Write([]byte(httpReq)); err != nil {
+		return 0, false
+	}
+
+	resp, err := http.ReadResponse(bufio.NewReader(io.LimitReader(tlsConn, 128<<10)), nil)
 	if err != nil {
 		return 0, false
 	}
@@ -366,12 +420,52 @@ func checkHTTP(proxyAddr string, timeout time.Duration) (time.Duration, bool) {
 	return time.Since(start), true
 }
 
-// checkSOCKS5 performs an RFC 1928 handshake (no-auth + CONNECT :443), verifies TLS, and checks YouTube robots.txt.
-func checkSOCKS5(proxyAddr string, timeout time.Duration) (time.Duration, bool) {
+func checkHTTP(proxyAddr string, dialTimeout, totalTimeout time.Duration) (time.Duration, bool) {
 	start := time.Now()
-	deadline := start.Add(timeout)
+	deadline := start.Add(totalTimeout)
 
-	conn, err := net.DialTimeout("tcp", proxyAddr, timeout)
+	conn, err := net.DialTimeout("tcp", proxyAddr, dialTimeout)
+	if err != nil {
+		return 0, false
+	}
+	defer conn.Close()
+	_ = conn.SetDeadline(deadline)
+
+	connectReq := fmt.Sprintf(
+		"CONNECT %s:%d HTTP/1.1\r\nHost: %s:%d\r\nProxy-Connection: Keep-Alive\r\n\r\n",
+		probeHost, probePort, probeHost, probePort,
+	)
+	if _, err := conn.Write([]byte(connectReq)); err != nil {
+		return 0, false
+	}
+
+	br := bufio.NewReader(io.LimitReader(conn, 8192))
+	statusLine, err := br.ReadString('\n')
+	if err != nil || !strings.HasPrefix(statusLine, "HTTP/1.") || !strings.Contains(statusLine, " 200") {
+		return 0, false
+	}
+	for i := 0; i < 32; i++ {
+		line, err := br.ReadString('\n')
+		if err != nil {
+			return 0, false
+		}
+		if strings.TrimRight(line, "\r\n") == "" {
+			break
+		}
+	}
+	if br.Buffered() != 0 {
+		return 0, false
+	}
+
+	return verifyYouTubeOverTunnel(conn, start, deadline)
+}
+
+// checkSOCKS5 performs an RFC 1928 handshake (no-auth + CONNECT :443), verifies TLS, and checks YouTube robots.txt.
+func checkSOCKS5(proxyAddr string, dialTimeout, totalTimeout time.Duration) (time.Duration, bool) {
+	start := time.Now()
+	deadline := start.Add(totalTimeout)
+
+	conn, err := net.DialTimeout("tcp", proxyAddr, dialTimeout)
 	if err != nil {
 		return 0, false
 	}
@@ -432,34 +526,7 @@ func checkSOCKS5(proxyAddr string, timeout time.Duration) (time.Duration, bool) 
 		return 0, false
 	}
 
-	// 4. Upgrade tunnel to verified TLS for probeHost
-	tlsConn := tls.Client(conn, &tls.Config{ServerName: probeHost})
-	ctx, cancel := context.WithDeadline(context.Background(), deadline)
-	defer cancel()
-	if err := tlsConn.HandshakeContext(ctx); err != nil {
-		return 0, false
-	}
-	_ = tlsConn.SetDeadline(deadline)
-
-	// 5. Send HTTPS request through the verified TLS tunnel
-	httpReq := "GET /robots.txt HTTP/1.1\r\nHost: " + probeHost + "\r\nUser-Agent: " + probeUA + "\r\nAccept-Encoding: identity\r\nConnection: close\r\n\r\n"
-	if _, err := tlsConn.Write([]byte(httpReq)); err != nil {
-		return 0, false
-	}
-
-	resp, err := http.ReadResponse(bufio.NewReader(io.LimitReader(tlsConn, 128<<10)), nil)
-	if err != nil {
-		return 0, false
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return 0, false
-	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
-	if err != nil || !isValidYouTubeRobots(body) {
-		return 0, false
-	}
-	return time.Since(start), true
+	return verifyYouTubeOverTunnel(conn, start, deadline)
 }
 
 func formatLines(items []string) []byte {
@@ -826,8 +893,10 @@ func sendTelegramSummary(botToken, chatID string, httpWorking, socks5Working int
 }
 
 func main() {
-	concurrency := envInt("CONCURRENCY", 1500, 1, 5000)
-	timeoutSec := envInt("TIMEOUT_SEC", 7, 1, 60)
+	concurrency := envInt("CONCURRENCY", 3500, 1, 8000)
+	dialTimeoutSec := envInt("DIAL_TIMEOUT_SEC", 2, 1, 15)
+	timeoutSec := envInt("TIMEOUT_SEC", 7, 2, 60)
+	dialTimeout := time.Duration(dialTimeoutSec) * time.Second
 	timeout := time.Duration(timeoutSec) * time.Second
 
 	botToken := strings.TrimSpace(os.Getenv("BOT_TOKEN"))
@@ -840,7 +909,7 @@ func main() {
 	}
 	tracker.start()
 
-	log.Printf("Gathering proxies (concurrency=%d, timeout=%s)...", concurrency, timeout)
+	log.Printf("Gathering proxies (concurrency=%d, dialTimeout=%s, totalTimeout=%s)...", concurrency, dialTimeout, timeout)
 	httpCandidates := gatherProxies(httpSources, 15*time.Second)
 	socks5Candidates := gatherProxies(socks5Sources, 15*time.Second)
 	log.Printf("Gathered unique candidates: HTTP=%d, SOCKS5=%d", len(httpCandidates), len(socks5Candidates))
@@ -850,7 +919,7 @@ func main() {
 	tracker.update()
 
 	httpWorking := verifyAll(httpCandidates, concurrency, func(addr string) (time.Duration, bool) {
-		return checkHTTP(addr, timeout)
+		return checkHTTP(addr, dialTimeout, timeout)
 	}, func(checked, working int) {
 		tracker.setHTTPProgress(checked, working)
 		tracker.update()
@@ -861,7 +930,7 @@ func main() {
 	tracker.update()
 
 	socks5Working := verifyAll(socks5Candidates, concurrency, func(addr string) (time.Duration, bool) {
-		return checkSOCKS5(addr, timeout)
+		return checkSOCKS5(addr, dialTimeout, timeout)
 	}, func(checked, working int) {
 		tracker.setSOCKS5Progress(checked, working)
 		tracker.update()
