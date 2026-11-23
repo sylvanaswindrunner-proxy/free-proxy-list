@@ -1,0 +1,531 @@
+package main
+
+import (
+	"bufio"
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"mime/multipart"
+	"net"
+	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+)
+
+const (
+	repoURL       = "https://github.com/sylvanaswindrunner-proxy/free-proxy-list"
+	rawBaseURL    = "https://raw.githubusercontent.com/sylvanaswindrunner-proxy/free-proxy-list/main/proxies"
+	probeHost     = "cp.cloudflare.com"
+	probeURL      = "http://cp.cloudflare.com/generate_204"
+	statsStartTag = "<!-- STATS:START -->"
+	statsEndTag   = "<!-- STATS:END -->"
+)
+
+var httpSources = []string{
+	"https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt",
+	"https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/http.txt",
+	"https://raw.githubusercontent.com/clarketm/proxy-list/master/proxy-list-raw.txt",
+	"https://raw.githubusercontent.com/ShiftyTR/Proxy-List/master/http.txt",
+	"https://raw.githubusercontent.com/mmpx12/proxy-list/master/http.txt",
+	"https://raw.githubusercontent.com/roosterkid/openproxylist/main/HTTPS_RAW.txt",
+	"https://cdn.jsdelivr.net/gh/proxifly/free-proxy-list@main/proxies/protocols/http/data.txt",
+	"https://raw.githubusercontent.com/vakhov/fresh-proxy-list/master/http.txt",
+	"https://raw.githubusercontent.com/Zaeem20/FREE_PROXIES_LIST/master/http.txt",
+	"https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http&timeout=10000&country=all&ssl=all&anonymity=all",
+}
+
+var socks5Sources = []string{
+	"https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/socks5.txt",
+	"https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/socks5.txt",
+	"https://raw.githubusercontent.com/hookzof/socks5_list/master/proxy.txt",
+	"https://raw.githubusercontent.com/ShiftyTR/Proxy-List/master/socks5.txt",
+	"https://raw.githubusercontent.com/mmpx12/proxy-list/master/socks5.txt",
+	"https://raw.githubusercontent.com/roosterkid/openproxylist/main/SOCKS5_RAW.txt",
+	"https://cdn.jsdelivr.net/gh/proxifly/free-proxy-list@main/proxies/protocols/socks5/data.txt",
+	"https://raw.githubusercontent.com/vakhov/fresh-proxy-list/master/socks5.txt",
+	"https://raw.githubusercontent.com/Zaeem20/FREE_PROXIES_LIST/master/socks5.txt",
+	"https://api.proxyscrape.com/v2/?request=displayproxies&protocol=socks5&timeout=10000&country=all",
+}
+
+var ipPortRe = regexp.MustCompile(`(\d{1,3}(?:\.\d{1,3}){3}):(\d{1,5})`)
+
+type ProtocolStats struct {
+	Tested  int `json:"tested"`
+	Working int `json:"working"`
+	Failed  int `json:"failed"`
+}
+
+type Stats struct {
+	UpdatedUTC string        `json:"updated_utc"`
+	HTTP       ProtocolStats `json:"http"`
+	SOCKS5     ProtocolStats `json:"socks5"`
+}
+
+func envInt(key string, def, minVal, maxVal int) int {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return def
+	}
+	v, err := strconv.Atoi(raw)
+	if err != nil {
+		return def
+	}
+	if v < minVal {
+		return minVal
+	}
+	if v > maxVal {
+		return maxVal
+	}
+	return v
+}
+
+func isValidPublicIPv4Port(ipStr, portStr string) (string, bool) {
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return "", false
+	}
+	ip4 := ip.To4()
+	if ip4 == nil || ip4.IsLoopback() || ip4.IsUnspecified() || ip4.IsPrivate() || ip4.IsLinkLocalUnicast() || ip4.IsMulticast() {
+		return "", false
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil || port < 1 || port > 65535 {
+		return "", false
+	}
+	return fmt.Sprintf("%s:%d", ip4.String(), port), true
+}
+
+func gatherProxies(sources []string, timeout time.Duration) []string {
+	client := &http.Client{Timeout: timeout}
+	seen := make(map[string]struct{})
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	for _, src := range sources {
+		wg.Add(1)
+		go func(srcURL string) {
+			defer wg.Done()
+			req, err := http.NewRequest(http.MethodGet, srcURL, nil)
+			if err != nil {
+				return
+			}
+			req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; ProxyGatherBot/1.0)")
+			resp, err := client.Do(req)
+			if err != nil {
+				log.Printf("warn: fetch %s failed: %v", srcURL, err)
+				return
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				log.Printf("warn: fetch %s returned status %d", srcURL, resp.StatusCode)
+				return
+			}
+			body, err := io.ReadAll(io.LimitReader(resp.Body, 16<<20))
+			if err != nil {
+				return
+			}
+			matches := ipPortRe.FindAllStringSubmatch(string(body), -1)
+			local := make([]string, 0, len(matches))
+			for _, m := range matches {
+				if addr, ok := isValidPublicIPv4Port(m[1], m[2]); ok {
+					local = append(local, addr)
+				}
+			}
+			mu.Lock()
+			for _, addr := range local {
+				seen[addr] = struct{}{}
+			}
+			mu.Unlock()
+		}(src)
+	}
+	wg.Wait()
+
+	list := make([]string, 0, len(seen))
+	for addr := range seen {
+		list = append(list, addr)
+	}
+	sort.Strings(list)
+	return list
+}
+
+func verifyAll(candidates []string, concurrency int, checkFn func(string) bool) []string {
+	if len(candidates) == 0 {
+		return nil
+	}
+	jobs := make(chan string, concurrency*2)
+	var mu sync.Mutex
+	var working []string
+	var wg sync.WaitGroup
+
+	workerCount := concurrency
+	if len(candidates) < workerCount {
+		workerCount = len(candidates)
+	}
+
+	for i := 0; i < workerCount; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for addr := range jobs {
+				if checkFn(addr) {
+					mu.Lock()
+					working = append(working, addr)
+					mu.Unlock()
+				}
+			}
+		}()
+	}
+
+	for _, c := range candidates {
+		jobs <- c
+	}
+	close(jobs)
+	wg.Wait()
+
+	sort.Strings(working)
+	return working
+}
+
+func checkHTTP(proxyAddr string, timeout time.Duration) bool {
+	u := &url.URL{Scheme: "http", Host: proxyAddr}
+	dialer := &net.Dialer{Timeout: timeout}
+	tr := &http.Transport{
+		Proxy:             http.ProxyURL(u),
+		DisableKeepAlives: true,
+		DialContext:       dialer.DialContext,
+	}
+	defer tr.CloseIdleConnections()
+
+	client := &http.Client{
+		Transport: tr,
+		Timeout:   timeout,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, probeURL, nil)
+	if err != nil {
+		return false
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false
+	}
+	resp.Body.Close()
+	return resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusOK
+}
+
+// checkSOCKS5 performs an RFC 1928 handshake (no-auth + CONNECT) and verifies an HTTP 204/200 response.
+func checkSOCKS5(proxyAddr string, timeout time.Duration) bool {
+	conn, err := net.DialTimeout("tcp", proxyAddr, timeout)
+	if err != nil {
+		return false
+	}
+	defer conn.Close()
+	_ = conn.SetDeadline(time.Now().Add(timeout))
+
+	// 1. Greeting: VER=5, NMETHODS=1, METHOD=0 (no auth)
+	if _, err := conn.Write([]byte{0x05, 0x01, 0x00}); err != nil {
+		return false
+	}
+	var greet [2]byte
+	if _, err := io.ReadFull(conn, greet[:]); err != nil {
+		return false
+	}
+	if greet[0] != 0x05 || greet[1] != 0x00 {
+		return false
+	}
+
+	// 2. CONNECT request to probeHost:80 (ATYP=0x03 domain)
+	req := make([]byte, 0, 7+len(probeHost))
+	req = append(req, 0x05, 0x01, 0x00, 0x03, byte(len(probeHost)))
+	req = append(req, probeHost...)
+	req = append(req, 0x00, 0x50)
+	if _, err := conn.Write(req); err != nil {
+		return false
+	}
+
+	var hdr [4]byte
+	if _, err := io.ReadFull(conn, hdr[:]); err != nil {
+		return false
+	}
+	if hdr[0] != 0x05 || hdr[1] != 0x00 {
+		return false
+	}
+
+	// 3. Skip bound address + 2-byte port
+	switch hdr[3] {
+	case 0x01: // IPv4
+		var b [6]byte
+		if _, err := io.ReadFull(conn, b[:]); err != nil {
+			return false
+		}
+	case 0x03: // Domain
+		var ln [1]byte
+		if _, err := io.ReadFull(conn, ln[:]); err != nil {
+			return false
+		}
+		buf := make([]byte, int(ln[0])+2)
+		if _, err := io.ReadFull(conn, buf); err != nil {
+			return false
+		}
+	case 0x04: // IPv6
+		var b [18]byte
+		if _, err := io.ReadFull(conn, b[:]); err != nil {
+			return false
+		}
+	default:
+		return false
+	}
+
+	// 4. Send minimal HTTP probe through the tunnel
+	httpReq := "GET /generate_204 HTTP/1.1\r\nHost: " + probeHost + "\r\nUser-Agent: Mozilla/5.0\r\nConnection: close\r\n\r\n"
+	if _, err := conn.Write([]byte(httpReq)); err != nil {
+		return false
+	}
+
+	reader := bufio.NewReader(io.LimitReader(conn, 1024))
+	statusLine, err := reader.ReadString('\n')
+	if err != nil && statusLine == "" {
+		return false
+	}
+	return strings.HasPrefix(statusLine, "HTTP/1.") &&
+		(strings.Contains(statusLine, " 204") || strings.Contains(statusLine, " 200"))
+}
+
+func formatLines(items []string) []byte {
+	if len(items) == 0 {
+		return []byte{}
+	}
+	return []byte(strings.Join(items, "\n") + "\n")
+}
+
+func writeOutputs(nowUTC time.Time, stats Stats, httpWorking, socks5Working []string) error {
+	if err := os.MkdirAll("proxies", 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join("proxies", "http.txt"), formatLines(httpWorking), 0o644); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join("proxies", "socks5.txt"), formatLines(socks5Working), 0o644); err != nil {
+		return err
+	}
+	statsJSON, err := json.MarshalIndent(stats, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join("proxies", "stats.json"), append(statsJSON, '\n'), 0o644); err != nil {
+		return err
+	}
+	return updateReadmeStats("README.md", nowUTC, stats)
+}
+
+func successRate(working, tested int) string {
+	if tested == 0 {
+		return "0.0%"
+	}
+	return fmt.Sprintf("%.1f%%", float64(working)*100.0/float64(tested))
+}
+
+func updateReadmeStats(path string, nowUTC time.Time, s Stats) error {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	content := string(raw)
+	startIdx := strings.Index(content, statsStartTag)
+	endIdx := strings.Index(content, statsEndTag)
+	if startIdx == -1 || endIdx == -1 || endIdx <= startIdx {
+		return nil
+	}
+
+	block := fmt.Sprintf(`%s
+> **Last Updated:** `+"`%s`"+` · **Next Scan:** Automatic every 6 hours (`+"`0 */6 * * *`"+` UTC)
+
+| Protocol | Tested | Working | Failed | Pass Rate | Raw List |
+| :--- | :---: | :---: | :---: | :---: | :--- |
+| **HTTP** | %d | **%d** | %d | %s | [http.txt](%s/http.txt) |
+| **SOCKS5** | %d | **%d** | %d | %s | [socks5.txt](%s/socks5.txt) |
+%s`,
+		statsStartTag,
+		nowUTC.Format("2006-01-02 15:04 UTC"),
+		s.HTTP.Tested, s.HTTP.Working, s.HTTP.Failed, successRate(s.HTTP.Working, s.HTTP.Tested), rawBaseURL,
+		s.SOCKS5.Tested, s.SOCKS5.Working, s.SOCKS5.Failed, successRate(s.SOCKS5.Working, s.SOCKS5.Tested), rawBaseURL,
+		statsEndTag,
+	)
+
+	updated := content[:startIdx] + block + content[endIdx+len(statsEndTag):]
+	return os.WriteFile(path, []byte(updated), 0o644)
+}
+
+func sendTelegramDocument(botToken, chatID, filename string, data []byte, caption string) error {
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+
+	if err := mw.WriteField("chat_id", chatID); err != nil {
+		return err
+	}
+	if err := mw.WriteField("caption", caption); err != nil {
+		return err
+	}
+	part, err := mw.CreateFormFile("document", filename)
+	if err != nil {
+		return err
+	}
+	if _, err := part.Write(data); err != nil {
+		return err
+	}
+	if err := mw.Close(); err != nil {
+		return err
+	}
+
+	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendDocument", botToken)
+	req, err := http.NewRequest(http.MethodPost, apiURL, &body)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+
+	client := &http.Client{Timeout: 60 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("sendDocument %s failed (%d): %s", filename, resp.StatusCode, string(respBody))
+	}
+	return nil
+}
+
+func sendTelegramSummary(botToken, chatID string, httpWorking, socks5Working int) error {
+	payload := map[string]any{
+		"chat_id": chatID,
+		"text": fmt.Sprintf(
+			"✅ Delivery complete\n🌐 HTTP: %d | 🔒 SOCKS5: %d\n⏱ Next auto scan in 6 hours",
+			httpWorking, socks5Working,
+		),
+		"reply_markup": map[string]any{
+			"inline_keyboard": [][]map[string]string{
+				{
+					{"text": "🔗 GitHub Repository", "url": repoURL},
+				},
+			},
+		},
+	}
+	jsonBytes, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", botToken)
+	req, err := http.NewRequest(http.MethodPost, apiURL, bytes.NewReader(jsonBytes))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("sendMessage failed (%d): %s", resp.StatusCode, string(respBody))
+	}
+	return nil
+}
+
+func main() {
+	concurrency := envInt("CONCURRENCY", 1000, 1, 5000)
+	timeoutSec := envInt("TIMEOUT_SEC", 6, 1, 60)
+	timeout := time.Duration(timeoutSec) * time.Second
+
+	log.Printf("Gathering proxies (concurrency=%d, timeout=%s)...", concurrency, timeout)
+	httpCandidates := gatherProxies(httpSources, 15*time.Second)
+	socks5Candidates := gatherProxies(socks5Sources, 15*time.Second)
+	log.Printf("Gathered unique candidates: HTTP=%d, SOCKS5=%d", len(httpCandidates), len(socks5Candidates))
+
+	httpWorking := verifyAll(httpCandidates, concurrency, func(addr string) bool {
+		return checkHTTP(addr, timeout)
+	})
+	log.Printf("Verified HTTP proxies: %d / %d working", len(httpWorking), len(httpCandidates))
+
+	socks5Working := verifyAll(socks5Candidates, concurrency, func(addr string) bool {
+		return checkSOCKS5(addr, timeout)
+	})
+	log.Printf("Verified SOCKS5 proxies: %d / %d working", len(socks5Working), len(socks5Candidates))
+
+	nowUTC := time.Now().UTC()
+	stats := Stats{
+		UpdatedUTC: nowUTC.Format(time.RFC3339),
+		HTTP: ProtocolStats{
+			Tested:  len(httpCandidates),
+			Working: len(httpWorking),
+			Failed:  len(httpCandidates) - len(httpWorking),
+		},
+		SOCKS5: ProtocolStats{
+			Tested:  len(socks5Candidates),
+			Working: len(socks5Working),
+			Failed:  len(socks5Candidates) - len(socks5Working),
+		},
+	}
+
+	if err := writeOutputs(nowUTC, stats, httpWorking, socks5Working); err != nil {
+		log.Fatalf("Failed writing outputs: %v", err)
+	}
+
+	botToken := strings.TrimSpace(os.Getenv("BOT_TOKEN"))
+	chatID := strings.TrimSpace(os.Getenv("CHAT_ID"))
+	if botToken == "" || chatID == "" {
+		log.Println("BOT_TOKEN or CHAT_ID not set; skipping Telegram delivery")
+		return
+	}
+
+	fileTS := nowUTC.Format("20060102_150405")
+	displayTS := nowUTC.Format("2006-01-02 15:04 UTC")
+
+	if len(httpWorking) > 0 {
+		caption := fmt.Sprintf(
+			"🌐 HTTP PROXY LIST\n📊 Tested: %d\n✅ Working: %d\n❌ Failed: %d\n🕒 %s",
+			stats.HTTP.Tested, stats.HTTP.Working, stats.HTTP.Failed, displayTS,
+		)
+		if err := sendTelegramDocument(botToken, chatID, fmt.Sprintf("working_http_%s.txt", fileTS), formatLines(httpWorking), caption); err != nil {
+			log.Fatalf("Telegram HTTP document error: %v", err)
+		}
+	}
+
+	if len(socks5Working) > 0 {
+		caption := fmt.Sprintf(
+			"🔒 SOCKS5 PROXY LIST\n📊 Tested: %d\n✅ Working: %d\n❌ Failed: %d\n🕒 %s",
+			stats.SOCKS5.Tested, stats.SOCKS5.Working, stats.SOCKS5.Failed, displayTS,
+		)
+		if err := sendTelegramDocument(botToken, chatID, fmt.Sprintf("working_socks5_%s.txt", fileTS), formatLines(socks5Working), caption); err != nil {
+			log.Fatalf("Telegram SOCKS5 document error: %v", err)
+		}
+	}
+
+	if err := sendTelegramSummary(botToken, chatID, stats.HTTP.Working, stats.SOCKS5.Working); err != nil {
+		log.Fatalf("Telegram summary error: %v", err)
+	}
+	log.Println("Telegram delivery completed successfully")
+}

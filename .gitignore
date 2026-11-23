@@ -1,6 +1,6 @@
 # Binaries and temp artifacts
-bot
-bot.exe
+/bot
+/bot.exe
 *.exe
 working_http_*.txt
 working_socks5_*.txt
