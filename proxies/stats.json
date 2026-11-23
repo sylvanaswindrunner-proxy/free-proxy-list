@@ -1,13 +1,13 @@
 {
-  "updated_utc": "2026-11-23T02:01:11Z",
+  "updated_utc": "2026-11-23T02:12:24Z",
   "http": {
-    "tested": 187319,
-    "working": 36839,
-    "failed": 150480
+    "tested": 187296,
+    "working": 36901,
+    "failed": 150395
   },
   "socks5": {
-    "tested": 173721,
-    "working": 242,
-    "failed": 173479
+    "tested": 173688,
+    "working": 234,
+    "failed": 173454
   }
 }
