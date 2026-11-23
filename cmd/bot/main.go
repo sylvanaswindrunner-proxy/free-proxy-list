@@ -26,9 +26,9 @@ import (
 const (
 	repoURL       = "https://github.com/sylvanaswindrunner-proxy/free-proxy-list"
 	rawBaseURL    = "https://raw.githubusercontent.com/sylvanaswindrunner-proxy/free-proxy-list/main/proxies"
-	probeHost     = "www.youtube.com"
+	probeHost     = "www.cloudflare.com"
 	probePort     = 443
-	probeURL      = "https://www.youtube.com/robots.txt"
+	probePath     = "/cdn-cgi/trace"
 	probeUA       = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 	statsStartTag = "<!-- STATS:START -->"
 	statsEndTag   = "<!-- STATS:END -->"
@@ -386,12 +386,12 @@ func verifyAll(candidates []string, concurrency int, checkFn func(string) (time.
 	return result
 }
 
-func isValidYouTubeRobots(body []byte) bool {
-	s := strings.ToLower(string(body))
-	return strings.Contains(s, "user-agent:") && strings.Contains(s, "disallow:")
+func isValidTraceBody(body []byte) bool {
+	s := string(body)
+	return strings.Contains(s, "fl=") && strings.Contains(s, "ip=")
 }
 
-func verifyYouTubeOverTunnel(conn net.Conn, start, deadline time.Time) (time.Duration, bool) {
+func verifyHTTPSOverTunnel(conn net.Conn, start, deadline time.Time) (time.Duration, bool) {
 	tlsConn := tls.Client(conn, &tls.Config{ServerName: probeHost})
 	ctx, cancel := context.WithDeadline(context.Background(), deadline)
 	defer cancel()
@@ -400,7 +400,7 @@ func verifyYouTubeOverTunnel(conn net.Conn, start, deadline time.Time) (time.Dur
 	}
 	_ = tlsConn.SetDeadline(deadline)
 
-	httpReq := "GET /robots.txt HTTP/1.1\r\nHost: " + probeHost + "\r\nUser-Agent: " + probeUA + "\r\nAccept-Encoding: identity\r\nConnection: close\r\n\r\n"
+	httpReq := "GET " + probePath + " HTTP/1.1\r\nHost: " + probeHost + "\r\nUser-Agent: " + probeUA + "\r\nAccept-Encoding: identity\r\nConnection: close\r\n\r\n"
 	if _, err := tlsConn.Write([]byte(httpReq)); err != nil {
 		return 0, false
 	}
@@ -414,7 +414,7 @@ func verifyYouTubeOverTunnel(conn net.Conn, start, deadline time.Time) (time.Dur
 		return 0, false
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
-	if err != nil || !isValidYouTubeRobots(body) {
+	if err != nil || !isValidTraceBody(body) {
 		return 0, false
 	}
 	return time.Since(start), true
@@ -457,10 +457,10 @@ func checkHTTP(proxyAddr string, dialTimeout, totalTimeout time.Duration) (time.
 		return 0, false
 	}
 
-	return verifyYouTubeOverTunnel(conn, start, deadline)
+	return verifyHTTPSOverTunnel(conn, start, deadline)
 }
 
-// checkSOCKS5 performs an RFC 1928 handshake (no-auth + CONNECT :443), verifies TLS, and checks YouTube robots.txt.
+// checkSOCKS5 performs an RFC 1928 handshake (no-auth + CONNECT :443), verifies TLS, and checks Cloudflare trace.
 func checkSOCKS5(proxyAddr string, dialTimeout, totalTimeout time.Duration) (time.Duration, bool) {
 	start := time.Now()
 	deadline := start.Add(totalTimeout)
@@ -526,7 +526,7 @@ func checkSOCKS5(proxyAddr string, dialTimeout, totalTimeout time.Duration) (tim
 		return 0, false
 	}
 
-	return verifyYouTubeOverTunnel(conn, start, deadline)
+	return verifyHTTPSOverTunnel(conn, start, deadline)
 }
 
 func formatLines(items []string) []byte {
@@ -893,9 +893,9 @@ func sendTelegramSummary(botToken, chatID string, httpWorking, socks5Working int
 }
 
 func main() {
-	concurrency := envInt("CONCURRENCY", 3500, 1, 8000)
-	dialTimeoutSec := envInt("DIAL_TIMEOUT_SEC", 2, 1, 15)
-	timeoutSec := envInt("TIMEOUT_SEC", 7, 2, 60)
+	concurrency := envInt("CONCURRENCY", 2500, 1, 8000)
+	dialTimeoutSec := envInt("DIAL_TIMEOUT_SEC", 3, 1, 15)
+	timeoutSec := envInt("TIMEOUT_SEC", 8, 2, 60)
 	dialTimeout := time.Duration(dialTimeoutSec) * time.Second
 	timeout := time.Duration(timeoutSec) * time.Second
 

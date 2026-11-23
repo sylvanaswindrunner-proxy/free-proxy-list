@@ -27,11 +27,11 @@
 
 ## ⚡ Why This Proxy List?
 
-- **Real HTTPS & YouTube End-to-End Verification (Not Ping-Only):**
-  - **HTTP proxies** must establish an HTTPS `CONNECT :443` tunnel with valid TLS certificate verification against `https://www.youtube.com/robots.txt`, return HTTP `200 OK` without redirect hijacking, and match genuine YouTube response content.
-  - **SOCKS5 proxies** complete a full **RFC 1928** handshake + `CONNECT :443` + verified TLS handshake + live `https://www.youtube.com/robots.txt` body validation.
+- **Real HTTPS End-to-End Verification (Not Ping-Only):**
+  - **HTTP proxies** must establish an HTTPS `CONNECT :443` tunnel with valid TLS certificate verification against `https://www.cloudflare.com/cdn-cgi/trace`, return HTTP `200 OK`, and match genuine trace response fields (`fl=`, `ip=`).
+  - **SOCKS5 proxies** complete a full **RFC 1928** handshake + `CONNECT :443` + verified TLS handshake + live `https://www.cloudflare.com/cdn-cgi/trace` body validation.
 - **Sorted Fastest-First:** Passing proxies are measured by end-to-end probe latency and sorted from fastest to slowest.
-- **Ultra-Fast Concurrent Go Engine:** Written in pure Go standard library (`1,500` concurrent workers, zero external dependencies).
+- **Ultra-Fast Concurrent Go Engine:** Written in pure Go standard library (`2,500` concurrent workers with fast 3s TCP dial fail-over, zero external dependencies).
 - **Clean & Deduplicated:** Extracts valid public IPv4 `IP:PORT` pairs, strips duplicates, loopback, and private RFC 1918 addresses, and sorts deterministically.
 - **100% Free & Serverless Automation:** Runs every 6 hours on public GitHub Actions runners and pushes fresh lists back to the repository and Telegram.
 
