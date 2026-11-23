@@ -35,27 +35,96 @@ const (
 var httpSources = []string{
 	"https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt",
 	"https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/http.txt",
+	"https://raw.githubusercontent.com/monosans/proxy-list/main/proxies_anonymous/http.txt",
+	"https://raw.githubusercontent.com/ALIILAPRO/Proxy/main/http.txt",
+	"https://raw.githubusercontent.com/prxchk/proxy-list/main/http.txt",
+	"https://raw.githubusercontent.com/komutan234/Proxy-List-Free/main/proxies/http.txt",
+	"https://raw.githubusercontent.com/ErcinDedeoglu/proxies/main/proxies/http.txt",
+	"https://raw.githubusercontent.com/ErcinDedeoglu/proxies/main/proxies/https.txt",
+	"https://raw.githubusercontent.com/MuRongPIG/Proxy-Master/main/http.txt",
+	"https://cdn.jsdelivr.net/gh/proxifly/free-proxy-list@main/proxies/protocols/http/data.txt",
+	"https://cdn.jsdelivr.net/gh/proxifly/free-proxy-list@main/proxies/protocols/https/data.txt",
+	"https://raw.githubusercontent.com/roosterkid/openproxylist/main/HTTPS_RAW.txt",
+	"https://raw.githubusercontent.com/vakhov/fresh-proxy-list/master/http.txt",
+	"https://raw.githubusercontent.com/vakhov/fresh-proxy-list/master/https.txt",
+	"https://raw.githubusercontent.com/Zaeem20/FREE_PROXIES_LIST/master/http.txt",
+	"https://raw.githubusercontent.com/Zaeem20/FREE_PROXIES_LIST/master/https.txt",
 	"https://raw.githubusercontent.com/clarketm/proxy-list/master/proxy-list-raw.txt",
 	"https://raw.githubusercontent.com/ShiftyTR/Proxy-List/master/http.txt",
+	"https://raw.githubusercontent.com/ShiftyTR/Proxy-List/master/https.txt",
 	"https://raw.githubusercontent.com/mmpx12/proxy-list/master/http.txt",
-	"https://raw.githubusercontent.com/roosterkid/openproxylist/main/HTTPS_RAW.txt",
-	"https://cdn.jsdelivr.net/gh/proxifly/free-proxy-list@main/proxies/protocols/http/data.txt",
-	"https://raw.githubusercontent.com/vakhov/fresh-proxy-list/master/http.txt",
-	"https://raw.githubusercontent.com/Zaeem20/FREE_PROXIES_LIST/master/http.txt",
+	"https://raw.githubusercontent.com/mmpx12/proxy-list/master/https.txt",
+	"https://raw.githubusercontent.com/sunny9577/proxy-scraper/master/generated/http_proxies.txt",
+	"https://raw.githubusercontent.com/officialputuid/KangProxy/KangProxy/xResults/Proxies/HTTP.txt",
+	"https://raw.githubusercontent.com/officialputuid/KangProxy/KangProxy/xResults/Proxies/HTTPS.txt",
+	"https://raw.githubusercontent.com/rdavydov/proxy-list/main/proxies/http.txt",
+	"https://raw.githubusercontent.com/rdavydov/proxy-list/main/proxies_anonymous/http.txt",
+	"https://raw.githubusercontent.com/jetkai/proxy-list/main/online-proxies/txt/proxies-http.txt",
+	"https://raw.githubusercontent.com/jetkai/proxy-list/main/online-proxies/txt/proxies-https.txt",
+	"https://raw.githubusercontent.com/elliottophellia/yakumo/master/results/http/global/http_checked.txt",
+	"https://raw.githubusercontent.com/zevtyardt/proxy-list/main/http.txt",
+	"https://raw.githubusercontent.com/Tsprnay/Proxy-lists/master/proxies/http.txt",
+	"https://raw.githubusercontent.com/Tsprnay/Proxy-lists/master/proxies/https.txt",
+	"https://raw.githubusercontent.com/ProxyScraper/ProxyScraper/main/http.txt",
+	"https://raw.githubusercontent.com/yemixzy/proxy-list/main/proxies/http.txt",
+	"https://raw.githubusercontent.com/saisuiu/Lionkings-Http-Proxys-Proxies/main/free.txt",
+	"https://raw.githubusercontent.com/HyperBeats/proxy-list/main/http.txt",
+	"https://raw.githubusercontent.com/mertguvencli/http-proxy-list/main/proxy-list/data.txt",
+	"https://raw.githubusercontent.com/almroot/proxylist/master/list.txt",
+	"https://raw.githubusercontent.com/aslisk/proxyhttps/main/https.txt",
+	"https://raw.githubusercontent.com/hendrikbgr/Free-Proxy-Repo/master/proxy_list.txt",
+	"https://raw.githubusercontent.com/B4RC0DE-TM/proxy-list/main/HTTP.txt",
+	"https://raw.githubusercontent.com/RX4096/proxy-list/main/online/http.txt",
+	"https://raw.githubusercontent.com/RX4096/proxy-list/main/online/https.txt",
+	"https://raw.githubusercontent.com/proxy4parsing/proxy-list/main/http.txt",
+	"https://raw.githubusercontent.com/dpangestuw/Free-Proxy/main/http_proxies.txt",
+	"https://raw.githubusercontent.com/tuanminpay/live-proxy/master/http.txt",
 	"https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http&timeout=10000&country=all&ssl=all&anonymity=all",
+	"https://api.proxyscrape.com/v3/free-proxy-list/get?request=displayproxies&protocol=http&proxy_format=ipport&format=text&timeout=20000",
+	"https://www.proxy-list.download/api/v1/get?type=http",
+	"https://www.proxy-list.download/api/v1/get?type=https",
+	"https://api.openproxylist.xyz/http.txt",
+	"https://proxyspace.pro/http.txt",
+	"https://proxyspace.pro/https.txt",
 }
 
 var socks5Sources = []string{
 	"https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/socks5.txt",
+	"https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/socks5.txt",
 	"https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/socks5.txt",
-	"https://raw.githubusercontent.com/hookzof/socks5_list/master/proxy.txt",
-	"https://raw.githubusercontent.com/ShiftyTR/Proxy-List/master/socks5.txt",
-	"https://raw.githubusercontent.com/mmpx12/proxy-list/master/socks5.txt",
-	"https://raw.githubusercontent.com/roosterkid/openproxylist/main/SOCKS5_RAW.txt",
+	"https://raw.githubusercontent.com/monosans/proxy-list/main/proxies_anonymous/socks5.txt",
+	"https://raw.githubusercontent.com/ALIILAPRO/Proxy/main/socks5.txt",
+	"https://raw.githubusercontent.com/prxchk/proxy-list/main/socks5.txt",
+	"https://raw.githubusercontent.com/komutan234/Proxy-List-Free/main/proxies/socks5.txt",
+	"https://raw.githubusercontent.com/ErcinDedeoglu/proxies/main/proxies/socks5.txt",
+	"https://raw.githubusercontent.com/MuRongPIG/Proxy-Master/main/socks5.txt",
 	"https://cdn.jsdelivr.net/gh/proxifly/free-proxy-list@main/proxies/protocols/socks5/data.txt",
+	"https://raw.githubusercontent.com/roosterkid/openproxylist/main/SOCKS5_RAW.txt",
 	"https://raw.githubusercontent.com/vakhov/fresh-proxy-list/master/socks5.txt",
 	"https://raw.githubusercontent.com/Zaeem20/FREE_PROXIES_LIST/master/socks5.txt",
+	"https://raw.githubusercontent.com/ShiftyTR/Proxy-List/master/socks5.txt",
+	"https://raw.githubusercontent.com/mmpx12/proxy-list/master/socks5.txt",
+	"https://raw.githubusercontent.com/hookzof/socks5_list/master/proxy.txt",
+	"https://raw.githubusercontent.com/sunny9577/proxy-scraper/master/generated/socks5_proxies.txt",
+	"https://raw.githubusercontent.com/officialputuid/KangProxy/KangProxy/xResults/Proxies/SOCKS5.txt",
+	"https://raw.githubusercontent.com/rdavydov/proxy-list/main/proxies/socks5.txt",
+	"https://raw.githubusercontent.com/rdavydov/proxy-list/main/proxies_anonymous/socks5.txt",
+	"https://raw.githubusercontent.com/jetkai/proxy-list/main/online-proxies/txt/proxies-socks5.txt",
+	"https://raw.githubusercontent.com/elliottophellia/yakumo/master/results/socks5/global/socks5_checked.txt",
+	"https://raw.githubusercontent.com/zevtyardt/proxy-list/main/socks5.txt",
+	"https://raw.githubusercontent.com/Tsprnay/Proxy-lists/master/proxies/socks5.txt",
+	"https://raw.githubusercontent.com/ProxyScraper/ProxyScraper/main/socks5.txt",
+	"https://raw.githubusercontent.com/yemixzy/proxy-list/main/proxies/socks5.txt",
+	"https://raw.githubusercontent.com/HyperBeats/proxy-list/main/socks5.txt",
+	"https://raw.githubusercontent.com/B4RC0DE-TM/proxy-list/main/SOCKS5.txt",
+	"https://raw.githubusercontent.com/dpangestuw/Free-Proxy/main/socks5_proxies.txt",
+	"https://raw.githubusercontent.com/tuanminpay/live-proxy/master/socks5.txt",
+	"https://raw.githubusercontent.com/manuGMG/proxy-365/main/SOCKS5.txt",
 	"https://api.proxyscrape.com/v2/?request=displayproxies&protocol=socks5&timeout=10000&country=all",
+	"https://api.proxyscrape.com/v3/free-proxy-list/get?request=displayproxies&protocol=socks5&proxy_format=ipport&format=text&timeout=20000",
+	"https://www.proxy-list.download/api/v1/get?type=socks5",
+	"https://api.openproxylist.xyz/socks5.txt",
+	"https://proxyspace.pro/socks5.txt",
 }
 
 var ipPortRe = regexp.MustCompile(`(\d{1,3}(?:\.\d{1,3}){3}):(\d{1,5})`)
@@ -415,6 +484,9 @@ func sendTelegramDocument(botToken, chatID, filename string, data []byte, captio
 	if err := mw.WriteField("chat_id", chatID); err != nil {
 		return err
 	}
+	if err := mw.WriteField("parse_mode", "HTML"); err != nil {
+		return err
+	}
 	if err := mw.WriteField("caption", caption); err != nil {
 		return err
 	}
@@ -680,15 +752,21 @@ func (t *liveTracker) update() {
 
 func sendTelegramSummary(botToken, chatID string, httpWorking, socks5Working int) error {
 	payload := map[string]any{
-		"chat_id": chatID,
+		"chat_id":                  chatID,
+		"parse_mode":               "HTML",
+		"disable_web_page_preview": true,
 		"text": fmt.Sprintf(
-			"✅ Delivery complete\n🌐 HTTP: %d | 🔒 SOCKS5: %d\n⏱ Next auto scan in 6 hours",
+			"✅ <b>Delivery complete</b>\n🌐 HTTP: <code>%d</code> | 🔒 SOCKS5: <code>%d</code>\n⏱ Next auto scan in <b>6 hours</b>",
 			httpWorking, socks5Working,
 		),
 		"reply_markup": map[string]any{
 			"inline_keyboard": [][]map[string]string{
 				{
-					{"text": "🔗 GitHub Repository", "url": repoURL},
+					{"text": "🛡️ OneForAllHub", "url": "https://t.me/OneForAllHub"},
+					{"text": "🔥 Free Proxy List", "url": repoURL},
+				},
+				{
+					{"text": "✅ @OneForAllHub", "url": "https://t.me/OneForAllHub"},
 				},
 			},
 		},
@@ -698,8 +776,8 @@ func sendTelegramSummary(botToken, chatID string, httpWorking, socks5Working int
 }
 
 func main() {
-	concurrency := envInt("CONCURRENCY", 1000, 1, 5000)
-	timeoutSec := envInt("TIMEOUT_SEC", 6, 1, 60)
+	concurrency := envInt("CONCURRENCY", 2500, 1, 5000)
+	timeoutSec := envInt("TIMEOUT_SEC", 5, 1, 60)
 	timeout := time.Duration(timeoutSec) * time.Second
 
 	botToken := strings.TrimSpace(os.Getenv("BOT_TOKEN"))
@@ -772,7 +850,7 @@ func main() {
 
 	if len(httpWorking) > 0 {
 		caption := fmt.Sprintf(
-			"🌐 HTTP PROXY LIST\n📊 Tested: %d\n✅ Working: %d\n❌ Failed: %d\n🕒 %s",
+			"🌐 <b>HTTP PROXY LIST</b>\n📊 Tested: <code>%d</code>\n✅ Working: <code>%d</code>\n❌ Failed: <code>%d</code>\n🕒 <code>%s</code>\n\n======================\n<b>List Of My Telegram Channel</b>\nhttps://t.me/OneForAllHub\n======================",
 			stats.HTTP.Tested, stats.HTTP.Working, stats.HTTP.Failed, displayTS,
 		)
 		if err := sendTelegramDocument(botToken, chatID, fmt.Sprintf("working_http_%s.txt", fileTS), formatLines(httpWorking), caption); err != nil {
@@ -782,7 +860,7 @@ func main() {
 
 	if len(socks5Working) > 0 {
 		caption := fmt.Sprintf(
-			"🔒 SOCKS5 PROXY LIST\n📊 Tested: %d\n✅ Working: %d\n❌ Failed: %d\n🕒 %s",
+			"🔒 <b>SOCKS5 PROXY LIST</b>\n📊 Tested: <code>%d</code>\n✅ Working: <code>%d</code>\n❌ Failed: <code>%d</code>\n🕒 <code>%s</code>\n\n======================\n<b>List Of My Telegram Channel</b>\nhttps://t.me/OneForAllHub\n======================",
 			stats.SOCKS5.Tested, stats.SOCKS5.Working, stats.SOCKS5.Failed, displayTS,
 		)
 		if err := sendTelegramDocument(botToken, chatID, fmt.Sprintf("working_socks5_%s.txt", fileTS), formatLines(socks5Working), caption); err != nil {

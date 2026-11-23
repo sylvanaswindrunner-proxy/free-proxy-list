@@ -30,8 +30,8 @@ jobs:
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
-          CONCURRENCY: "1000"
-          TIMEOUT_SEC: "6"
+          CONCURRENCY: "2500"
+          TIMEOUT_SEC: "5"
         run: |
           ulimit -n 65535 || true
           go run ./cmd/bot
