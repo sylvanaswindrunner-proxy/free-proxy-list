@@ -1,0 +1,13 @@
+{
+  "updated_utc": "",
+  "http": {
+    "tested": 0,
+    "working": 0,
+    "failed": 0
+  },
+  "socks5": {
+    "tested": 0,
+    "working": 0,
+    "failed": 0
+  }
+}

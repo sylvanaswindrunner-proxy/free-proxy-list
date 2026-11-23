@@ -1,0 +1,8 @@
+# Binaries and temp artifacts
+bot
+bot.exe
+*.exe
+working_http_*.txt
+working_socks5_*.txt
+.DS_Store
+Thumbs.db
