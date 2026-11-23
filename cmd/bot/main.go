@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -158,14 +159,19 @@ func gatherProxies(sources []string, timeout time.Duration) []string {
 	return list
 }
 
-func verifyAll(candidates []string, concurrency int, checkFn func(string) bool) []string {
+func verifyAll(candidates []string, concurrency int, checkFn func(string) bool, onProgress func(checked, working int)) []string {
 	if len(candidates) == 0 {
+		if onProgress != nil {
+			onProgress(0, 0)
+		}
 		return nil
 	}
 	jobs := make(chan string, concurrency*2)
 	var mu sync.Mutex
 	var working []string
 	var wg sync.WaitGroup
+	var checked atomic.Int64
+	var workingCount atomic.Int64
 
 	workerCount := concurrency
 	if len(candidates) < workerCount {
@@ -177,10 +183,32 @@ func verifyAll(candidates []string, concurrency int, checkFn func(string) bool) 
 		go func() {
 			defer wg.Done()
 			for addr := range jobs {
-				if checkFn(addr) {
+				ok := checkFn(addr)
+				checked.Add(1)
+				if ok {
+					workingCount.Add(1)
 					mu.Lock()
 					working = append(working, addr)
 					mu.Unlock()
+				}
+			}
+		}()
+	}
+
+	done := make(chan struct{})
+	var tickerWg sync.WaitGroup
+	if onProgress != nil {
+		tickerWg.Add(1)
+		go func() {
+			defer tickerWg.Done()
+			ticker := time.NewTicker(3 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-done:
+					return
+				case <-ticker.C:
+					onProgress(int(checked.Load()), int(workingCount.Load()))
 				}
 			}
 		}()
@@ -191,6 +219,12 @@ func verifyAll(candidates []string, concurrency int, checkFn func(string) bool) 
 	}
 	close(jobs)
 	wg.Wait()
+
+	if onProgress != nil {
+		close(done)
+		tickerWg.Wait()
+		onProgress(len(candidates), len(working))
+	}
 
 	sort.Strings(working)
 	return working
@@ -415,6 +449,235 @@ func sendTelegramDocument(botToken, chatID, filename string, data []byte, captio
 	return nil
 }
 
+func postTelegramJSON(botToken, method string, payload any) ([]byte, error) {
+	jsonBytes, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/%s", botToken, method)
+	req, err := http.NewRequest(http.MethodPost, apiURL, bytes.NewReader(jsonBytes))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 8192))
+	if resp.StatusCode != http.StatusOK {
+		return respBody, fmt.Errorf("%s failed (%d): %s", method, resp.StatusCode, string(respBody))
+	}
+	return respBody, nil
+}
+
+func sendTelegramStatus(botToken, chatID, text string) (int64, error) {
+	respBody, err := postTelegramJSON(botToken, "sendMessage", map[string]any{
+		"chat_id": chatID,
+		"text":    text,
+	})
+	if err != nil {
+		return 0, err
+	}
+	var parsed struct {
+		Ok     bool `json:"ok"`
+		Result struct {
+			MessageID int64 `json:"message_id"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(respBody, &parsed); err != nil {
+		return 0, err
+	}
+	if !parsed.Ok || parsed.Result.MessageID == 0 {
+		return 0, fmt.Errorf("unexpected sendMessage response: %s", string(respBody))
+	}
+	return parsed.Result.MessageID, nil
+}
+
+func editTelegramStatus(botToken, chatID string, messageID int64, text string) error {
+	_, err := postTelegramJSON(botToken, "editMessageText", map[string]any{
+		"chat_id":    chatID,
+		"message_id": messageID,
+		"text":       text,
+	})
+	return err
+}
+
+func renderBar(done, total int) string {
+	const width = 10
+	if total <= 0 {
+		return "[" + strings.Repeat("░", width) + "]"
+	}
+	filled := (done * width) / total
+	if filled < 0 {
+		filled = 0
+	}
+	if filled > width {
+		filled = width
+	}
+	return "[" + strings.Repeat("█", filled) + strings.Repeat("░", width-filled) + "]"
+}
+
+func formatDuration(d time.Duration) string {
+	sec := int(d.Round(time.Second).Seconds())
+	if sec < 0 {
+		sec = 0
+	}
+	if sec < 60 {
+		return fmt.Sprintf("%ds", sec)
+	}
+	return fmt.Sprintf("%dm %ds", sec/60, sec%60)
+}
+
+type liveTracker struct {
+	botToken      string
+	chatID        string
+	msgID         int64
+	startedAt     time.Time
+	lastText      string
+	mu            sync.Mutex
+	phase         string
+	httpTotal     int
+	httpChecked   int
+	httpWorking   int
+	socks5Total   int
+	socks5Checked int
+	socks5Working int
+}
+
+func (t *liveTracker) start() {
+	if t.botToken == "" || t.chatID == "" {
+		return
+	}
+	t.mu.Lock()
+	t.phase = "gathering"
+	initial := "🔄 Proxy Scan Started\n📥 Gathering proxy lists from sources..."
+	t.mu.Unlock()
+
+	msgID, err := sendTelegramStatus(t.botToken, t.chatID, initial)
+	if err != nil {
+		log.Printf("warn: failed sending initial live status: %v", err)
+		return
+	}
+	t.mu.Lock()
+	t.msgID = msgID
+	t.lastText = initial
+	t.mu.Unlock()
+}
+
+func (t *liveTracker) setTotals(httpTotal, socks5Total int) {
+	t.mu.Lock()
+	t.httpTotal = httpTotal
+	t.socks5Total = socks5Total
+	t.mu.Unlock()
+}
+
+func (t *liveTracker) setPhase(phase string) {
+	t.mu.Lock()
+	t.phase = phase
+	t.mu.Unlock()
+}
+
+func (t *liveTracker) setHTTPProgress(checked, working int) {
+	t.mu.Lock()
+	t.httpChecked = checked
+	t.httpWorking = working
+	t.mu.Unlock()
+}
+
+func (t *liveTracker) setSOCKS5Progress(checked, working int) {
+	t.mu.Lock()
+	t.socks5Checked = checked
+	t.socks5Working = working
+	t.mu.Unlock()
+}
+
+func pct(done, total int) int {
+	if total <= 0 {
+		return 0
+	}
+	p := (done * 100) / total
+	if p > 100 {
+		p = 100
+	}
+	return p
+}
+
+func (t *liveTracker) renderLocked() string {
+	header := "🔄 Live Proxy Scan"
+	switch t.phase {
+	case "gathering":
+		return "🔄 Proxy Scan Started\n📥 Gathering proxy lists from sources..."
+	case "http":
+		header = "🔄 Live Proxy Scan — Checking HTTP..."
+	case "socks5":
+		header = "🔄 Live Proxy Scan — Checking SOCKS5..."
+	case "uploading":
+		header = "📤 Uploading verified proxy files to Telegram..."
+	case "done":
+		header = "✅ Proxy Scan Completed"
+	}
+
+	httpFailed := t.httpChecked - t.httpWorking
+	if httpFailed < 0 {
+		httpFailed = 0
+	}
+	socks5Failed := t.socks5Checked - t.socks5Working
+	if socks5Failed < 0 {
+		socks5Failed = 0
+	}
+
+	return fmt.Sprintf(
+		"%s\n⏱ Elapsed: %s\n\n"+
+			"🌐 HTTP Proxies (Collected: %d)\n"+
+			"%s %d%% (%d / %d)\n"+
+			"✅ Working: %d | ❌ Failed: %d\n\n"+
+			"🔒 SOCKS5 Proxies (Collected: %d)\n"+
+			"%s %d%% (%d / %d)\n"+
+			"✅ Working: %d | ❌ Failed: %d",
+		header,
+		formatDuration(time.Since(t.startedAt)),
+		t.httpTotal,
+		renderBar(t.httpChecked, t.httpTotal), pct(t.httpChecked, t.httpTotal), t.httpChecked, t.httpTotal,
+		t.httpWorking, httpFailed,
+		t.socks5Total,
+		renderBar(t.socks5Checked, t.socks5Total), pct(t.socks5Checked, t.socks5Total), t.socks5Checked, t.socks5Total,
+		t.socks5Working, socks5Failed,
+	)
+}
+
+func (t *liveTracker) update() {
+	t.mu.Lock()
+	if t.botToken == "" || t.chatID == "" || t.msgID == 0 {
+		t.mu.Unlock()
+		return
+	}
+	text := t.renderLocked()
+	if text == t.lastText {
+		t.mu.Unlock()
+		return
+	}
+	msgID := t.msgID
+	botToken := t.botToken
+	chatID := t.chatID
+	t.mu.Unlock()
+
+	if err := editTelegramStatus(botToken, chatID, msgID, text); err != nil {
+		if !strings.Contains(err.Error(), "message is not modified") {
+			log.Printf("warn: live status edit failed: %v", err)
+		}
+		return
+	}
+
+	t.mu.Lock()
+	t.lastText = text
+	t.mu.Unlock()
+}
+
 func sendTelegramSummary(botToken, chatID string, httpWorking, socks5Working int) error {
 	payload := map[string]any{
 		"chat_id": chatID,
@@ -430,29 +693,8 @@ func sendTelegramSummary(botToken, chatID string, httpWorking, socks5Working int
 			},
 		},
 	}
-	jsonBytes, err := json.Marshal(payload)
-	if err != nil {
-		return err
-	}
-
-	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", botToken)
-	req, err := http.NewRequest(http.MethodPost, apiURL, bytes.NewReader(jsonBytes))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("sendMessage failed (%d): %s", resp.StatusCode, string(respBody))
-	}
-	return nil
+	_, err := postTelegramJSON(botToken, "sendMessage", payload)
+	return err
 }
 
 func main() {
@@ -460,18 +702,41 @@ func main() {
 	timeoutSec := envInt("TIMEOUT_SEC", 6, 1, 60)
 	timeout := time.Duration(timeoutSec) * time.Second
 
+	botToken := strings.TrimSpace(os.Getenv("BOT_TOKEN"))
+	chatID := strings.TrimSpace(os.Getenv("CHAT_ID"))
+
+	tracker := &liveTracker{
+		botToken:  botToken,
+		chatID:    chatID,
+		startedAt: time.Now(),
+	}
+	tracker.start()
+
 	log.Printf("Gathering proxies (concurrency=%d, timeout=%s)...", concurrency, timeout)
 	httpCandidates := gatherProxies(httpSources, 15*time.Second)
 	socks5Candidates := gatherProxies(socks5Sources, 15*time.Second)
 	log.Printf("Gathered unique candidates: HTTP=%d, SOCKS5=%d", len(httpCandidates), len(socks5Candidates))
 
+	tracker.setTotals(len(httpCandidates), len(socks5Candidates))
+	tracker.setPhase("http")
+	tracker.update()
+
 	httpWorking := verifyAll(httpCandidates, concurrency, func(addr string) bool {
 		return checkHTTP(addr, timeout)
+	}, func(checked, working int) {
+		tracker.setHTTPProgress(checked, working)
+		tracker.update()
 	})
 	log.Printf("Verified HTTP proxies: %d / %d working", len(httpWorking), len(httpCandidates))
 
+	tracker.setPhase("socks5")
+	tracker.update()
+
 	socks5Working := verifyAll(socks5Candidates, concurrency, func(addr string) bool {
 		return checkSOCKS5(addr, timeout)
+	}, func(checked, working int) {
+		tracker.setSOCKS5Progress(checked, working)
+		tracker.update()
 	})
 	log.Printf("Verified SOCKS5 proxies: %d / %d working", len(socks5Working), len(socks5Candidates))
 
@@ -494,12 +759,13 @@ func main() {
 		log.Fatalf("Failed writing outputs: %v", err)
 	}
 
-	botToken := strings.TrimSpace(os.Getenv("BOT_TOKEN"))
-	chatID := strings.TrimSpace(os.Getenv("CHAT_ID"))
 	if botToken == "" || chatID == "" {
 		log.Println("BOT_TOKEN or CHAT_ID not set; skipping Telegram delivery")
 		return
 	}
+
+	tracker.setPhase("uploading")
+	tracker.update()
 
 	fileTS := nowUTC.Format("20060102_150405")
 	displayTS := nowUTC.Format("2006-01-02 15:04 UTC")
@@ -527,5 +793,8 @@ func main() {
 	if err := sendTelegramSummary(botToken, chatID, stats.HTTP.Working, stats.SOCKS5.Working); err != nil {
 		log.Fatalf("Telegram summary error: %v", err)
 	}
+
+	tracker.setPhase("done")
+	tracker.update()
 	log.Println("Telegram delivery completed successfully")
 }
