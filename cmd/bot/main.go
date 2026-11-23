@@ -901,10 +901,14 @@ func main() {
 
 	botToken := strings.TrimSpace(os.Getenv("BOT_TOKEN"))
 	chatID := strings.TrimSpace(os.Getenv("CHAT_ID"))
+	statusChatID := strings.TrimSpace(os.Getenv("STATUS_CHAT_ID"))
+	if statusChatID == "" && chatID != "" && !strings.HasPrefix(chatID, "@") && !strings.HasPrefix(chatID, "-100") {
+		statusChatID = chatID
+	}
 
 	tracker := &liveTracker{
 		botToken:  botToken,
-		chatID:    chatID,
+		chatID:    statusChatID,
 		startedAt: time.Now(),
 	}
 	tracker.start()
