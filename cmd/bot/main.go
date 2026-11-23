@@ -763,10 +763,10 @@ func sendTelegramSummary(botToken, chatID string, httpWorking, socks5Working int
 			"inline_keyboard": [][]map[string]string{
 				{
 					{"text": "🛡️ OneForAllHub", "url": "https://t.me/OneForAllHub"},
-					{"text": "🔥 Free Proxy List", "url": repoURL},
+					{"text": "🔥 HQPROX", "url": "https://t.me/HQPROX"},
 				},
 				{
-					{"text": "✅ @OneForAllHub", "url": "https://t.me/OneForAllHub"},
+					{"text": "⭐ Star on GitHub", "url": repoURL},
 				},
 			},
 		},
@@ -850,8 +850,8 @@ func main() {
 
 	if len(httpWorking) > 0 {
 		caption := fmt.Sprintf(
-			"🌐 <b>HTTP PROXY LIST</b>\n📊 Tested: <code>%d</code>\n✅ Working: <code>%d</code>\n❌ Failed: <code>%d</code>\n🕒 <code>%s</code>\n\n======================\n<b>List Of My Telegram Channel</b>\nhttps://t.me/OneForAllHub\n======================",
-			stats.HTTP.Tested, stats.HTTP.Working, stats.HTTP.Failed, displayTS,
+			"🌐 <b>HTTP PROXY LIST</b>\n📊 Tested: <code>%d</code>\n✅ Working: <code>%d</code>\n❌ Failed: <code>%d</code>\n🕒 <code>%s</code>\n\n======================\n<b>List Of My Telegram Channel</b>\nhttps://t.me/HQPROX\nhttps://t.me/OneForAllHub\n======================\n⭐ <b>Star on GitHub:</b>\n%s",
+			stats.HTTP.Tested, stats.HTTP.Working, stats.HTTP.Failed, displayTS, repoURL,
 		)
 		if err := sendTelegramDocument(botToken, chatID, fmt.Sprintf("working_http_%s.txt", fileTS), formatLines(httpWorking), caption); err != nil {
 			log.Fatalf("Telegram HTTP document error: %v", err)
@@ -860,8 +860,8 @@ func main() {
 
 	if len(socks5Working) > 0 {
 		caption := fmt.Sprintf(
-			"🔒 <b>SOCKS5 PROXY LIST</b>\n📊 Tested: <code>%d</code>\n✅ Working: <code>%d</code>\n❌ Failed: <code>%d</code>\n🕒 <code>%s</code>\n\n======================\n<b>List Of My Telegram Channel</b>\nhttps://t.me/OneForAllHub\n======================",
-			stats.SOCKS5.Tested, stats.SOCKS5.Working, stats.SOCKS5.Failed, displayTS,
+			"🔒 <b>SOCKS5 PROXY LIST</b>\n📊 Tested: <code>%d</code>\n✅ Working: <code>%d</code>\n❌ Failed: <code>%d</code>\n🕒 <code>%s</code>\n\n======================\n<b>List Of My Telegram Channel</b>\nhttps://t.me/HQPROX\nhttps://t.me/OneForAllHub\n======================\n⭐ <b>Star on GitHub:</b>\n%s",
+			stats.SOCKS5.Tested, stats.SOCKS5.Working, stats.SOCKS5.Failed, displayTS, repoURL,
 		)
 		if err := sendTelegramDocument(botToken, chatID, fmt.Sprintf("working_socks5_%s.txt", fileTS), formatLines(socks5Working), caption); err != nil {
 			log.Fatalf("Telegram SOCKS5 document error: %v", err)
