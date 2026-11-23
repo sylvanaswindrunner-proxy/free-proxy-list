@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -26,8 +27,10 @@ import (
 const (
 	repoURL       = "https://github.com/sylvanaswindrunner-proxy/free-proxy-list"
 	rawBaseURL    = "https://raw.githubusercontent.com/sylvanaswindrunner-proxy/free-proxy-list/main/proxies"
-	probeHost     = "cp.cloudflare.com"
-	probeURL      = "http://cp.cloudflare.com/generate_204"
+	probeHost     = "www.youtube.com"
+	probePort     = 443
+	probeURL      = "https://www.youtube.com/robots.txt"
+	probeUA       = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 	statsStartTag = "<!-- STATS:START -->"
 	statsEndTag   = "<!-- STATS:END -->"
 )
@@ -228,7 +231,12 @@ func gatherProxies(sources []string, timeout time.Duration) []string {
 	return list
 }
 
-func verifyAll(candidates []string, concurrency int, checkFn func(string) bool, onProgress func(checked, working int)) []string {
+type checkedProxy struct {
+	addr    string
+	latency time.Duration
+}
+
+func verifyAll(candidates []string, concurrency int, checkFn func(string) (time.Duration, bool), onProgress func(checked, working int)) []string {
 	if len(candidates) == 0 {
 		if onProgress != nil {
 			onProgress(0, 0)
@@ -237,7 +245,7 @@ func verifyAll(candidates []string, concurrency int, checkFn func(string) bool, 
 	}
 	jobs := make(chan string, concurrency*2)
 	var mu sync.Mutex
-	var working []string
+	var working []checkedProxy
 	var wg sync.WaitGroup
 	var checked atomic.Int64
 	var workingCount atomic.Int64
@@ -252,12 +260,12 @@ func verifyAll(candidates []string, concurrency int, checkFn func(string) bool, 
 		go func() {
 			defer wg.Done()
 			for addr := range jobs {
-				ok := checkFn(addr)
+				latency, ok := checkFn(addr)
 				checked.Add(1)
 				if ok {
 					workingCount.Add(1)
 					mu.Lock()
-					working = append(working, addr)
+					working = append(working, checkedProxy{addr: addr, latency: latency})
 					mu.Unlock()
 				}
 			}
@@ -295,17 +303,33 @@ func verifyAll(candidates []string, concurrency int, checkFn func(string) bool, 
 		onProgress(len(candidates), len(working))
 	}
 
-	sort.Strings(working)
-	return working
+	sort.Slice(working, func(i, j int) bool {
+		if working[i].latency == working[j].latency {
+			return working[i].addr < working[j].addr
+		}
+		return working[i].latency < working[j].latency
+	})
+	result := make([]string, len(working))
+	for i, p := range working {
+		result[i] = p.addr
+	}
+	return result
 }
 
-func checkHTTP(proxyAddr string, timeout time.Duration) bool {
+func isValidYouTubeRobots(body []byte) bool {
+	s := strings.ToLower(string(body))
+	return strings.Contains(s, "user-agent:") && strings.Contains(s, "disallow:")
+}
+
+func checkHTTP(proxyAddr string, timeout time.Duration) (time.Duration, bool) {
+	start := time.Now()
 	u := &url.URL{Scheme: "http", Host: proxyAddr}
 	dialer := &net.Dialer{Timeout: timeout}
 	tr := &http.Transport{
-		Proxy:             http.ProxyURL(u),
-		DisableKeepAlives: true,
-		DialContext:       dialer.DialContext,
+		Proxy:               http.ProxyURL(u),
+		DisableKeepAlives:   true,
+		DialContext:         dialer.DialContext,
+		TLSHandshakeTimeout: timeout,
 	}
 	defer tr.CloseIdleConnections()
 
@@ -322,54 +346,65 @@ func checkHTTP(proxyAddr string, timeout time.Duration) bool {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, probeURL, nil)
 	if err != nil {
-		return false
+		return 0, false
 	}
-	req.Header.Set("User-Agent", "Mozilla/5.0")
+	req.Header.Set("User-Agent", probeUA)
+	req.Header.Set("Accept-Encoding", "identity")
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return false
+		return 0, false
 	}
-	resp.Body.Close()
-	return resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusOK
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return 0, false
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
+	if err != nil || !isValidYouTubeRobots(body) {
+		return 0, false
+	}
+	return time.Since(start), true
 }
 
-// checkSOCKS5 performs an RFC 1928 handshake (no-auth + CONNECT) and verifies an HTTP 204/200 response.
-func checkSOCKS5(proxyAddr string, timeout time.Duration) bool {
+// checkSOCKS5 performs an RFC 1928 handshake (no-auth + CONNECT :443), verifies TLS, and checks YouTube robots.txt.
+func checkSOCKS5(proxyAddr string, timeout time.Duration) (time.Duration, bool) {
+	start := time.Now()
+	deadline := start.Add(timeout)
+
 	conn, err := net.DialTimeout("tcp", proxyAddr, timeout)
 	if err != nil {
-		return false
+		return 0, false
 	}
 	defer conn.Close()
-	_ = conn.SetDeadline(time.Now().Add(timeout))
+	_ = conn.SetDeadline(deadline)
 
 	// 1. Greeting: VER=5, NMETHODS=1, METHOD=0 (no auth)
 	if _, err := conn.Write([]byte{0x05, 0x01, 0x00}); err != nil {
-		return false
+		return 0, false
 	}
 	var greet [2]byte
 	if _, err := io.ReadFull(conn, greet[:]); err != nil {
-		return false
+		return 0, false
 	}
 	if greet[0] != 0x05 || greet[1] != 0x00 {
-		return false
+		return 0, false
 	}
 
-	// 2. CONNECT request to probeHost:80 (ATYP=0x03 domain)
+	// 2. CONNECT request to probeHost:443 (ATYP=0x03 domain)
 	req := make([]byte, 0, 7+len(probeHost))
 	req = append(req, 0x05, 0x01, 0x00, 0x03, byte(len(probeHost)))
 	req = append(req, probeHost...)
-	req = append(req, 0x00, 0x50)
+	req = append(req, byte(probePort>>8), byte(probePort&0xff))
 	if _, err := conn.Write(req); err != nil {
-		return false
+		return 0, false
 	}
 
 	var hdr [4]byte
 	if _, err := io.ReadFull(conn, hdr[:]); err != nil {
-		return false
+		return 0, false
 	}
 	if hdr[0] != 0x05 || hdr[1] != 0x00 {
-		return false
+		return 0, false
 	}
 
 	// 3. Skip bound address + 2-byte port
@@ -377,39 +412,54 @@ func checkSOCKS5(proxyAddr string, timeout time.Duration) bool {
 	case 0x01: // IPv4
 		var b [6]byte
 		if _, err := io.ReadFull(conn, b[:]); err != nil {
-			return false
+			return 0, false
 		}
 	case 0x03: // Domain
 		var ln [1]byte
 		if _, err := io.ReadFull(conn, ln[:]); err != nil {
-			return false
+			return 0, false
 		}
 		buf := make([]byte, int(ln[0])+2)
 		if _, err := io.ReadFull(conn, buf); err != nil {
-			return false
+			return 0, false
 		}
 	case 0x04: // IPv6
 		var b [18]byte
 		if _, err := io.ReadFull(conn, b[:]); err != nil {
-			return false
+			return 0, false
 		}
 	default:
-		return false
+		return 0, false
 	}
 
-	// 4. Send minimal HTTP probe through the tunnel
-	httpReq := "GET /generate_204 HTTP/1.1\r\nHost: " + probeHost + "\r\nUser-Agent: Mozilla/5.0\r\nConnection: close\r\n\r\n"
-	if _, err := conn.Write([]byte(httpReq)); err != nil {
-		return false
+	// 4. Upgrade tunnel to verified TLS for probeHost
+	tlsConn := tls.Client(conn, &tls.Config{ServerName: probeHost})
+	ctx, cancel := context.WithDeadline(context.Background(), deadline)
+	defer cancel()
+	if err := tlsConn.HandshakeContext(ctx); err != nil {
+		return 0, false
+	}
+	_ = tlsConn.SetDeadline(deadline)
+
+	// 5. Send HTTPS request through the verified TLS tunnel
+	httpReq := "GET /robots.txt HTTP/1.1\r\nHost: " + probeHost + "\r\nUser-Agent: " + probeUA + "\r\nAccept-Encoding: identity\r\nConnection: close\r\n\r\n"
+	if _, err := tlsConn.Write([]byte(httpReq)); err != nil {
+		return 0, false
 	}
 
-	reader := bufio.NewReader(io.LimitReader(conn, 1024))
-	statusLine, err := reader.ReadString('\n')
-	if err != nil && statusLine == "" {
-		return false
+	resp, err := http.ReadResponse(bufio.NewReader(io.LimitReader(tlsConn, 128<<10)), nil)
+	if err != nil {
+		return 0, false
 	}
-	return strings.HasPrefix(statusLine, "HTTP/1.") &&
-		(strings.Contains(statusLine, " 204") || strings.Contains(statusLine, " 200"))
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return 0, false
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
+	if err != nil || !isValidYouTubeRobots(body) {
+		return 0, false
+	}
+	return time.Since(start), true
 }
 
 func formatLines(items []string) []byte {
@@ -776,8 +826,8 @@ func sendTelegramSummary(botToken, chatID string, httpWorking, socks5Working int
 }
 
 func main() {
-	concurrency := envInt("CONCURRENCY", 2500, 1, 5000)
-	timeoutSec := envInt("TIMEOUT_SEC", 5, 1, 60)
+	concurrency := envInt("CONCURRENCY", 1500, 1, 5000)
+	timeoutSec := envInt("TIMEOUT_SEC", 7, 1, 60)
 	timeout := time.Duration(timeoutSec) * time.Second
 
 	botToken := strings.TrimSpace(os.Getenv("BOT_TOKEN"))
@@ -799,7 +849,7 @@ func main() {
 	tracker.setPhase("http")
 	tracker.update()
 
-	httpWorking := verifyAll(httpCandidates, concurrency, func(addr string) bool {
+	httpWorking := verifyAll(httpCandidates, concurrency, func(addr string) (time.Duration, bool) {
 		return checkHTTP(addr, timeout)
 	}, func(checked, working int) {
 		tracker.setHTTPProgress(checked, working)
@@ -810,7 +860,7 @@ func main() {
 	tracker.setPhase("socks5")
 	tracker.update()
 
-	socks5Working := verifyAll(socks5Candidates, concurrency, func(addr string) bool {
+	socks5Working := verifyAll(socks5Candidates, concurrency, func(addr string) (time.Duration, bool) {
 		return checkSOCKS5(addr, timeout)
 	}, func(checked, working int) {
 		tracker.setSOCKS5Progress(checked, working)
