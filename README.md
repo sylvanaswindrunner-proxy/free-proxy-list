@@ -13,12 +13,12 @@
 ## 📊 Live Proxy Statistics
 
 <!-- STATS:START -->
-> **Last Updated:** `2026-11-25 18:48 UTC` · **Next Scan:** Automatic every 6 hours (`0 */6 * * *` UTC)
+> **Last Updated:** `2026-11-26 00:59 UTC` · **Next Scan:** Automatic every 6 hours (`0 */6 * * *` UTC)
 
 | Protocol | Tested | Working | Failed | Pass Rate | Raw List |
 | :--- | :---: | :---: | :---: | :---: | :--- |
-| **HTTP** | 254916 | **917** | 253999 | 0.4% | [http.txt](https://raw.githubusercontent.com/sylvanaswindrunner-proxy/free-proxy-list/main/proxies/http.txt) |
-| **SOCKS5** | 178987 | **175** | 178812 | 0.1% | [socks5.txt](https://raw.githubusercontent.com/sylvanaswindrunner-proxy/free-proxy-list/main/proxies/socks5.txt) |
+| **HTTP** | 254729 | **1143** | 253586 | 0.4% | [http.txt](https://raw.githubusercontent.com/sylvanaswindrunner-proxy/free-proxy-list/main/proxies/http.txt) |
+| **SOCKS5** | 179052 | **166** | 178886 | 0.1% | [socks5.txt](https://raw.githubusercontent.com/sylvanaswindrunner-proxy/free-proxy-list/main/proxies/socks5.txt) |
 <!-- STATS:END -->
 
 > JSON stats feed: [proxies/stats.json](https://raw.githubusercontent.com/sylvanaswindrunner-proxy/free-proxy-list/main/proxies/stats.json)
